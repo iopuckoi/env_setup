@@ -103,6 +103,7 @@ setup_dev() {
             --install-extension aaron-bond.better-comments \
             --install-extension Atishay-Jain.All-Autocomplete \
             --install-extension christian-kohler.path-intellisense \
+            --install-extension DotJoshJohnson.xml \
             --install-extension esbenp.prettier-vscode \
             --install-extension formulahendry.code-runner \
             --install-extension GrapeCity.gc-excelviewer \
