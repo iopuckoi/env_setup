@@ -7,9 +7,24 @@ BOLD="\033[1m"
 DISTRO=""
 FIRA_CODE_VERSION="6.2"
 GREEN="\033[1;32m"
+NODE_VERSION="v16.20.0"
+NVM_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh"
 RESET="\033[0m"
 GITHUB="git@github.com"
 YES_OR_NO="(${GREEN}y${RESET}/${GREEN}n${RESET})"
+
+########################################################################################
+# Setup Java and Javac.
+configure_java() {
+  # Maven, Java8 and Java 11 are all installed in install_deps and are already set up
+  # in my dotfiles .bashrc.
+  echo "Setting up Java..."
+  echo "Configure java alternatives..."
+  sudo alternatives --config java
+  echo "Configure javac alternatives..."
+  sudo alternatives --config javac
+  echo "==============================================================================="
+}
 
 ########################################################################################
 # Get Linux distribution.
@@ -27,11 +42,70 @@ install_deps() {
   if [[ "$DISTRO" == "CENTOS" ]]; then
     sudo yum groupinstall "Development Tools" -y
     sudo yum install zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
-      openssl-devel xz xz-devel libffi-devel findutils tk-devel epel-release -y
+      openssl-devel xz xz-devel libffi-devel findutils tk-devel epel-release terminator firefox \
+      java-1.8.0-openjdk java-1.8.0-openjdk-devel java-11-openjdk java-11-openjdk-devel maven -y
     sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
     sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
     # sudo yum check-update
   fi
+}
+
+########################################################################################
+# Install dotfiles and set up VSCode config files.
+install_dotfiles() {
+  # Install dotfiles.
+  if [ -d $HOME/.git ]; then
+    echo "Dotfiles already installed."
+  else
+    echo "Installing dotfiles..."
+    git clone --bare ${GITHUB}:iopuckoi/dotfiles.git $HOME/.git
+    git config core.bare false
+  fi
+  echo "==============================================================================="
+
+  # Setup VSCode configuration files.
+  if [ ! -d $HOME/.config/Code/User ]; then
+    echo "Creating VSCode config directory..."
+    mkdir -p $HOME/.config/Code/User
+  fi
+
+  echo "Creating symlinks for VSCode config files..."
+  if [ ! -f $HOME/.config/Code/User/keybindings.json ]; then
+    ln -s $HOME/VSCode/keybindings.json $HOME/.config/Code/User/keybindings.json
+  fi
+  if [ ! -f $HOME/.config/Code/User/tasks.json ]; then
+    ln -s $HOME/VSCode/tasks.json $HOME/.config/Code/User/tasks.json
+  fi
+  if [ ! -f $HOME/.config/Code/User/settings.json ]; then
+    ln -s $HOME/VSCode/settings.json $HOME/.config/Code/User/settings.json
+  fi
+  if [ ! -f $HOME/.config/Code/User/workspace_settings.json ]; then
+    ln -s $HOME/VSCode/workspace_settings.json $HOME/.config/Code/User/workspace_settings.json
+  fi
+  echo "==============================================================================="
+}
+
+########################################################################################
+# Install and setup any fonts.
+install_fonts() {
+  # Install FiraCode fonts.
+  echo "Installing FiraCode..."
+  fonts_dir="${HOME}/.local/share/fonts"
+  if [ ! -d "${fonts_dir}" ]; then
+      echo "mkdir -p $fonts_dir"
+      mkdir -p "${fonts_dir}"
+  else
+      echo "Found fonts dir : $fonts_dir"
+  fi
+
+  zip=Fira_Code_v${FIRA_CODE_VERSION}.zip
+  curl --fail --location --show-error https://github.com/tonsky/FiraCode/releases/download/${FIRA_CODE_VERSION}/${zip} --output ${zip}
+  unzip -o -q -d ${fonts_dir} ${zip}
+  rm ${zip}
+
+  echo "Updating font cache..."
+  fc-cache -f
+  echo "==============================================================================="
 }
 
 ########################################################################################
@@ -50,46 +124,87 @@ install_git() {
       if [[ "$DISTRO" == "CENTOS" ]]; then
         echo "Installing git..."
         sudo yum install git
-        echo
       fi
     fi
   else
     echo "Git is already installed : ${RESPONSE}"
   fi
+  echo "==============================================================================="
 }
 
 ########################################################################################
-# Setup dev directory.
-setup_dev() {
-  # Install Git.
-  if [ -d $HOME/.git ]; then
-    echo "Dotfiles already installed."
+# Install kotlin.
+install_kotlin() {
+  RESPONSE=$(kotlin -version)
+  REPLY="X"
+  MATCH="command not found"
+  if [[ $RESPONSE =~ $MATCH ]]; then
+    while [[ $REPLY =~ ^[^YyNn]$ ]] || [[ -z $REPLY ]]; do
+      read -p "$(echo -e "Kotlin is not installed.  Install now ${YES_OR_NO}? :  ")" -n 1 -r
+      echo
+    done
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      echo "Installing kotlin..."
+      sudo snap install kotlin --classic
+    fi
   else
-    echo "Installing dotfiles..."
-    git clone --bare ${GITHUB}:iopuckoi/dotfiles.git $HOME/.git
-    git config core.bare false
-    echo
+    echo "Kotlin is already installed : ${RESPONSE}"
   fi
+  echo "==============================================================================="
+}
 
-  # Install FiraCode fonts.
-  echo "Installing FiraCode..."
-  fonts_dir="${HOME}/.local/share/fonts"
-  if [ ! -d "${fonts_dir}" ]; then
-      echo "mkdir -p $fonts_dir"
-      mkdir -p "${fonts_dir}"
+########################################################################################
+# Install nvm and nodejs.
+install_nodejs() {
+  if [ -d $HOME/.nvm ]; then
+    echo "Nvm already installed."
   else
-      echo "Found fonts dir : $fonts_dir"
+    echo "Installing nvm..."
+    wget -qO- $NVM_URL | bash
+    source $HOME/.bashrc
+    nvm install $NODE_VERSION
+    nvm use node
+    nvm alias default node
   fi
+  echo "==============================================================================="
+}
 
-  zip=Fira_Code_v${FIRA_CODE_VERSION}.zip
-  curl --fail --location --show-error https://github.com/tonsky/FiraCode/releases/download/${FIRA_CODE_VERSION}/${zip} --output ${zip}
-  unzip -o -q -d ${fonts_dir} ${zip}
-  rm ${zip}
+########################################################################################
+# Install pyenv.
+install_pyenv() {
+  if [ -d $HOME/dev/penv ]; then
+    echo "Penv already installed."
+  else
+    echo "Installing penv..."
+    git clone ${GITHUB}:iopuckoi/penv.git $HOME/dev/penv
+    echo "Setting up pyenv..."
+    $HOME/dev/penv setup
+  fi
+  echo "==============================================================================="
+}
 
-  echo "Updating font cache..."
-  fc-cache -f
+########################################################################################
+# Install snapd.
+install_snapd() {
+  RESPONSE=$(snap version)
+  REPLY="X"
+  MATCH="command not found"
+  if [[ $RESPONSE =~ $MATCH ]]; then
+    echo "Installing and setting up snapd..."
+    sudo yum install snapd -y
+    sudo systemctl enable --now snapd.socket
+    sudo ln -s /var/lib/snapd/snap /snap
+    echo ""
+  else
+    echo "Snapd is already installed : ${RESPONSE}"
+  fi
+  echo "==============================================================================="
+}
 
-  # Install and setup VSCode.
+########################################################################################
+# Install VSCode.
+install_vscode() {
   RESPONSE=$(which code)
   REPLY="X"
   MATCH="no code in"
@@ -149,129 +264,48 @@ setup_dev() {
             # Themes
             --install-extension daylerees.rainglow \
             --install-extension johnpapa.winteriscoming
-
-      echo ""
     fi
   else
     echo "VSCode is already installed : ${RESPONSE}"
   fi
+  echo "==============================================================================="
+}
 
-  if [ ! -d $HOME/.config/Code/User ]; then
-    echo "Creating VSCode config directory..."
-    mkdir -p $HOME/.config/Code/User
-    echo ""
-  fi
-  echo "Creating symlinks for VSCode config files..."
-  if [ ! -f $HOME/.config/Code/User/keybindings.json ]; then
-    ln -s $HOME/VSCode/keybindings.json $HOME/.config/Code/User/keybindings.json
-  fi
-  if [ ! -f $HOME/.config/Code/User/tasks.json ]; then
-    ln -s $HOME/VSCode/tasks.json $HOME/.config/Code/User/tasks.json
-  fi
-  if [ ! -f $HOME/.config/Code/User/settings.json ]; then
-    ln -s $HOME/VSCode/settings.json $HOME/.config/Code/User/settings.json
-  fi
-  if [ ! -f $HOME/.config/Code/User/workspace_settings.json ]; then
-    ln -s $HOME/VSCode/workspace_settings.json $HOME/.config/Code/User/workspace_settings.json
-  fi
-  echo ""
-
+########################################################################################
+# Setup dev directory.
+setup_dev() {
   # Setup development directory.
   if [ -d $HOME/dev ]; then
     echo "Dev directory already exists."
   else
     echo "Creating dev directory..."
     mkdir $HOME/dev
-    echo ""
   fi
+  echo "==============================================================================="
 
-  # Install snapd.
-  RESPONSE=$(snap version)
-  REPLY="X"
-  MATCH="command not found"
-  if [[ $RESPONSE =~ $MATCH ]]; then
-    echo "Installing and setting up snapd..."
-    sudo yum install snapd -y
-    sudo systemctl enable --now snapd.socket
-    sudo ln -s /var/lib/snapd/snap /snap
-    echo ""
-  else
-    echo "Snapd is already installed : ${RESPONSE}"
-  fi
+  install_git
 
-  # Setup Java and Javac.
-  echo "Setting up Java..."
-  sudo yum install java-1.8.0-openjdk java-1.8.0-openjdk-devel java-11-openjdk java-11-openjdk-devel -y
-  echo "Configure java alternatives..."
-  sudo alternatives --config java
-  echo "Configure javac alternatives..."
-  sudo alternatives --config javac
-  echo ""
+  install_dotfiles
 
-  # Install Kotlin.
-  RESPONSE=$(kotlin -version)
-  REPLY="X"
-  MATCH="command not found"
-  if [[ $RESPONSE =~ $MATCH ]]; then
-    while [[ $REPLY =~ ^[^YyNn]$ ]] || [[ -z $REPLY ]]; do
-      read -p "$(echo -e "Kotlin is not installed.  Install now ${YES_OR_NO}? :  ")" -n 1 -r
-      echo
-    done
+  install_fonts
 
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-      echo "Installing kotlin..."
-      sudo snap install kotlin --classic
-      echo ""
-    fi
-  else
-    echo "Kotlin is already installed : ${RESPONSE}"
-  fi
+  install_vscode
 
-  # Setup pyenv.
-  if [ -d $HOME/dev/penv ]; then
-    echo "Penv already installed."
-  else
-    echo "Installing penv..."
-    git clone ${GITHUB}:iopuckoi/penv.git $HOME/dev/penv
-    echo "Setting up pyenv..."
-    $HOME/dev/penv setup
-    echo ""
-  fi
+  install_snapd
+
+  configure_java
+
+  install_kotlin
+
+  install_pyenv
+
+  install_nodejs
 }
 
+########################################################################################
+# Main entrypoint.
 get_distro
 
 install_deps
 
-install_git
-
 setup_dev
-
-
-
-
-########################################################################################
-# Main entrypoint.
-# if [ $# -eq 0 ]; then
-#   usage
-#   exit 1
-# fi
-
-# case $1 in
-#     create)
-#         create
-#         ;;
-#     remove)
-#         remove
-#         ;;
-#     setup)
-#         setup
-#         ;;
-#     update)
-#         update
-#         ;;
-#     *)
-#         echo -e "Unknown argument: $1"
-#         usage
-#         exit
-# esac
