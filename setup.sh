@@ -133,6 +133,28 @@ install_git() {
 }
 
 ########################################################################################
+# Install gradle.
+install_gradle() {
+  RESPONSE=$(gradle -v)
+  REPLY="X"
+  MATCH="command not found"
+  if [[ $RESPONSE =~ $MATCH ]]; then
+    while [[ $REPLY =~ ^[^YyNn]$ ]] || [[ -z $REPLY ]]; do
+      read -p "$(echo -e "Gradle is not installed.  Install now ${YES_OR_NO}? :  ")" -n 1 -r
+      echo
+    done
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      echo "Installing gradle..."
+      sudo snap install gradle --classic
+    fi
+  else
+    echo "Gradle is already installed : ${RESPONSE}"
+  fi
+  echo "==============================================================================="
+}
+
+########################################################################################
 # Install kotlin.
 install_kotlin() {
   RESPONSE=$(kotlin -version)
@@ -232,6 +254,7 @@ install_vscode() {
             --install-extension VisualStudioExptTeam.vscodeintellicode \
             # Java extensions
             --install-extension redhat.java \
+            --install-extension vscjava.vscode-gradle \
             --install-extension vscjava.vscode-java-debug \
             --install-extension vscjava.vscode-java-dependency \
             --install-extension vscjava.vscode-java-pack \
@@ -294,6 +317,8 @@ setup_dev() {
   install_snapd
 
   configure_java
+
+  install_gradle
 
   install_kotlin
 
