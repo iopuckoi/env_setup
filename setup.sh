@@ -6,6 +6,7 @@ BLINKING_BLUE="\033[1;5;34m"
 BOLD="\033[1m"
 DISTRO=""
 FIRA_CODE_VERSION="6.2"
+GOLANG_VERSION="1.20"
 GREEN="\033[1;32m"
 NODE_VERSION="v16.20.0"
 NVM_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh"
@@ -26,6 +27,7 @@ usage() {
   echo "  fonts       Install fonts"
   echo "  git         Install Git"
   echo "  gnome       Install Gnome desktop"
+  echo "  golang      Install Golang"
   echo "  gradle      Install Gradle"
   echo "  java        Install and setup Java and Maven"
   echo "  kotlin      Install Kotlin"
@@ -158,11 +160,38 @@ install_git() {
 }
 
 ########################################################################################
+# Install Golang.
+install_golang() {
+  RESPONSE=$(go version 2>/dev/null  || echo "Not found")
+  REPLY="X"
+  MATCH="Not found"
+  if [[ $RESPONSE =~ $MATCH ]]; then
+    while [[ $REPLY =~ ^[^YyNn]$ ]] || [[ -z $REPLY ]]; do
+      read -p "$(echo -e "Golang is not installed.  Install now ${YES_OR_NO}? :  ")" -n 1 -r
+      echo
+    done
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      echo "Installing Golang..."
+      sudo snap install go --channel=$GOLANG_VERSION/stable --classic
+      echo -e "${BLINKING_BLUE}# Make sure the following are in your rc file:${RESET}"
+      echo
+      echo -e "${GREEN}export GOROOT=/var/lib/snapd/snap/go/current${RESET}"
+      echo -e "${GREEN}export GOPATH=/path/to/go/packages${RESET}"
+      echo -e "${GREEN}PATH=\$PATH:\$GOROOT/bin:\$GOPATH${RESET}"
+    fi
+  else
+    echo "Golang is already installed : ${RESPONSE}"
+  fi
+  echo "==============================================================================="
+}
+
+########################################################################################
 # Install gradle.
 install_gradle() {
-  RESPONSE=$(gradle -v)
+  RESPONSE=$(gradle -v 2>/dev/null  || echo "Not found")
   REPLY="X"
-  MATCH="command not found"
+  MATCH="Not found"
   if [[ $RESPONSE =~ $MATCH ]]; then
     while [[ $REPLY =~ ^[^YyNn]$ ]] || [[ -z $REPLY ]]; do
       read -p "$(echo -e "Gradle is not installed.  Install now ${YES_OR_NO}? :  ")" -n 1 -r
@@ -172,6 +201,10 @@ install_gradle() {
     if [[ $REPLY =~ ^[Yy]$ ]]; then
       echo "Installing gradle..."
       sudo snap install gradle --classic
+      echo -e "${BLINKING_BLUE}# Make sure the following are in your rc file:${RESET}"
+      echo
+      echo -e "${GREEN}export GRADLE_HOME=/var/lib/snapd/snap/gradle/current/opt/gradle${RESET}"
+      echo -e "${GREEN}PATH=\$PATH:\$GRADLE_HOME/bin${RESET}"
     fi
   else
     echo "Gradle is already installed : ${RESPONSE}"
@@ -207,9 +240,9 @@ install_java() {
 ########################################################################################
 # Install kotlin.
 install_kotlin() {
-  RESPONSE=$(kotlin -version)
+  RESPONSE=$(kotlin -version 2>/dev/null  || echo "Not found")
   REPLY="X"
-  MATCH="command not found"
+  MATCH="Not found"
   if [[ $RESPONSE =~ $MATCH ]]; then
     while [[ $REPLY =~ ^[^YyNn]$ ]] || [[ -z $REPLY ]]; do
       read -p "$(echo -e "Kotlin is not installed.  Install now ${YES_OR_NO}? :  ")" -n 1 -r
@@ -219,6 +252,10 @@ install_kotlin() {
     if [[ $REPLY =~ ^[Yy]$ ]]; then
       echo "Installing kotlin..."
       sudo snap install kotlin --classic
+      echo -e "${BLINKING_BLUE}# Make sure the following are in your rc file:${RESET}"
+      echo
+      echo -e "${GREEN}export KOTLIN_HOME=/var/lib/snapd/snap/kotlin/current${RESET}"
+      echo -e "${GREEN}PATH=\$PATH:\$KOTLIN_HOME/bin${RESET}"
     fi
   else
     echo "Kotlin is already installed : ${RESPONSE}"
@@ -259,9 +296,9 @@ install_pyenv() {
 ########################################################################################
 # Install snapd.
 install_snapd() {
-  RESPONSE=$(snap version)
+  RESPONSE=$(snap version 2>/dev/null  || echo "Not found")
   REPLY="X"
-  MATCH="command not found"
+  MATCH="Not found"
   if [[ $RESPONSE =~ $MATCH ]]; then
     echo "Installing and setting up snapd..."
     sudo yum install snapd -y
@@ -277,9 +314,9 @@ install_snapd() {
 ########################################################################################
 # Install VSCode.
 install_vscode() {
-  RESPONSE=$(which code)
+  RESPONSE=$(which code 2>/dev/null  || echo "Not found")
   REPLY="X"
-  MATCH="no code in"
+  MATCH="Not found"
   if [[ $RESPONSE =~ $MATCH ]]; then
     if [[ "$DISTRO" == "CENTOS" ]]; then
       echo "Installing VSCode..."
@@ -512,6 +549,9 @@ case $1 in
         ;;
     gnome)
         setup_gnome
+        ;;
+    golang)
+        install_golang
         ;;
     gradle)
         install_gradle
