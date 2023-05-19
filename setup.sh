@@ -33,6 +33,7 @@ usage() {
   echo "  python      Install Python"
   echo "  snapd       Install Snapd"
   echo "  vscode      Install VSCode and extensions"
+  echo "  webdev      Setup firewall for webdev"
   echo "  xfce        Install Xfce desktop"
   echo ""
   exit 1
@@ -421,19 +422,14 @@ setup_gnome() {
 }
 
 ########################################################################################
-# Setup Xrdp.
-setup_xrdp() {
-  RESPONSE=$(systemctl status xrdp)
-  REPLY="X"
-  MATCH="Unit xrdp.service could not be found."
-  if [[ $RESPONSE =~ $MATCH ]]; then
-    echo "Installing xrdp..."
-    sudo yum install xrdp -y
-    sudo systemctl enable xrdp
-    sudo systemctl start xrdp
-  else
-    echo "xrdp already installed, restarting the service..."
-    sudo systemctl restart xrdp
+# Setup firewall for webdev.
+setup_webdev() {
+  if [[ "$DISTRO" == "CENTOS" ]]; then
+    sudo firewall-cmd --permanent --add-port=8080/tcp
+    sudo firewall-cmd --permanent --add-service=http
+    sudo firewall-cmd --reload
+    sudo systemctl restart firewalld
+    sudo systemctl status firewalld
   fi
 }
 
@@ -457,6 +453,31 @@ setup_xfce() {
     fi
 
     setup_xrdp
+  fi
+}
+
+########################################################################################
+# Setup Xrdp.
+setup_xrdp() {
+  if [[ "$DISTRO" == "CENTOS" ]]; then
+    RESPONSE=$(systemctl status xrdp)
+    REPLY="X"
+    MATCH="Unit xrdp.service could not be found."
+    if [[ $RESPONSE =~ $MATCH ]]; then
+      echo "Installing xrdp..."
+      sudo yum install xrdp -y
+      sudo systemctl enable xrdp
+      sudo systemctl start xrdp
+    else
+      echo "xrdp already installed, restarting the service..."
+      sudo systemctl restart xrdp
+    fi
+
+    # Setup firewall rules to allow RDP connections.
+    sudo firewall-cmd --permanent --add-port=3389/tcp
+    sudo firewall-cmd --reload
+    sudo systemctl restart firewalld
+    sudo systemctl status firewalld
   fi
 }
 
@@ -510,11 +531,14 @@ case $1 in
     snapd)
         install_snapd
         ;;
-    xfce)
-        setup_xfce
-        ;;
     vscode)
         install_vscode
+        ;;
+    webdev)
+        setup_webdev
+        ;;
+    xfce)
+        setup_xfce
         ;;
     *)
         echo -e "Unknown argument: $1"
