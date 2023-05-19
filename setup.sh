@@ -14,16 +14,25 @@ GITHUB="git@github.com"
 YES_OR_NO="(${GREEN}y${RESET}/${GREEN}n${RESET})"
 
 ########################################################################################
-# Setup Java and Javac.
-configure_java() {
-  # Maven, Java8 and Java 11 are all installed in install_deps and are already set up
-  # in my dotfiles .bashrc.
-  echo "Setting up Java..."
-  echo "Configure java alternatives..."
-  sudo alternatives --config java
-  echo "Configure javac alternatives..."
-  sudo alternatives --config javac
-  echo "==============================================================================="
+usage() {
+  echo "Usage: ${0} [COMMAND]..."
+  echo "Setup dev environment thingies."
+  echo ""
+  echo "Arguments are space separated and are as follows:"
+  echo "  all         Install everything"
+  echo "  deps        Install dependencies"
+  echo "  dotfiles    Install dotfiles"
+  echo "  fonts       Install fonts"
+  echo "  git         Install Git"
+  echo "  gradle      Install Gradle"
+  echo "  java        Install and setup Java and Maven"
+  echo "  kotlin      Install Kotlin"
+  echo "  nodejs      Install NodeJS"
+  echo "  python      Install Python"
+  echo "  snapd       Install Snapd"
+  echo "  vscode      Install VSCode and extensions"
+  echo ""
+  exit 1
 }
 
 ########################################################################################
@@ -155,6 +164,31 @@ install_gradle() {
 }
 
 ########################################################################################
+# Setup Java and Javac.
+install_java() {
+  if [[ "$DISTRO" == "CENTOS" ]]; then
+    echo "Installing Java and Maven..."
+    sudo yum install java-1.8.0-openjdk java-1.8.0-openjdk-devel java-11-openjdk \
+      java-11-openjdk-devel maven -y
+    echo "Setting up Java..."
+    echo "Configure java alternatives..."
+    sudo alternatives --config java
+    echo "Configure javac alternatives..."
+    sudo alternatives --config javac
+    echo "==============================================================================="
+
+    { echo -e "${BLINKING_BLUE}# Make sure the following are in your rc file:${RESET}"
+      echo
+      echo -e "${GREEN}export JAVA_HOME=\$(dirname \$(dirname \$(readlink \$(readlink \$(which javac)))))${RESET}"
+      echo -e "${GREEN}export CLASSPATH=.:\$JAVA_HOME/jre/lib:\$JAVA_HOME/lib:\$JAVA_HOME/lib/tools.jar${RESET}"
+      echo -e "${GREEN}export M2_HOME=/opt/maven${RESET}"
+      echo -e "${GREEN}export MAVEN_HOME=/opt/maven${RESET}"
+      echo -e "${GREEN}export PATH=\$PATH:\$M2_HOME/bin:\$JAVA_HOME/bin${RESET}"
+    } >&2
+  fi
+}
+
+########################################################################################
 # Install kotlin.
 install_kotlin() {
   RESPONSE=$(kotlin -version)
@@ -200,9 +234,9 @@ install_pyenv() {
   else
     echo "Installing penv..."
     git clone ${GITHUB}:iopuckoi/penv.git $HOME/dev/penv
-    echo "Setting up pyenv..."
-    $HOME/dev/penv setup
   fi
+  echo "Setting up pyenv..."
+  $HOME/dev/penv setup
   echo "==============================================================================="
 }
 
@@ -329,8 +363,53 @@ setup_dev() {
 
 ########################################################################################
 # Main entrypoint.
+if [ $# -eq 0 ]; then
+  usage
+  exit 1
+fi
+
 get_distro
 
-install_deps
-
-setup_dev
+case $1 in
+    all)
+        install_deps
+        setup_dev
+        ;;
+    deps)
+        install_deps
+        ;;
+    dotfiles)
+        install_dotfiles
+        ;;
+    fonts)
+        install_fonts
+        ;;
+    git)
+        install_git
+        ;;
+    gradle)
+        install_gradle
+        ;;
+    java)
+        install_java
+        ;;
+    kotlin)
+        install_kotlin
+        ;;
+    nodejs)
+        install_nodejs
+        ;;
+    pyenv)
+        install_pyenv
+        ;;
+    snapd)
+        install_snapd
+        ;;
+    vscode)
+        install_vscode
+        ;;
+    *)
+        echo -e "Unknown argument: $1"
+        usage
+        exit
+esac
