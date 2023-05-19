@@ -20,10 +20,12 @@ usage() {
   echo ""
   echo "Arguments are space separated and are as follows:"
   echo "  all         Install everything"
+  echo "  cinnamon    Install Cinnamon desktop"
   echo "  deps        Install dependencies"
   echo "  dotfiles    Install dotfiles"
   echo "  fonts       Install fonts"
   echo "  git         Install Git"
+  echo "  gnome       Install Gnome desktop"
   echo "  gradle      Install Gradle"
   echo "  java        Install and setup Java and Maven"
   echo "  kotlin      Install Kotlin"
@@ -31,8 +33,20 @@ usage() {
   echo "  python      Install Python"
   echo "  snapd       Install Snapd"
   echo "  vscode      Install VSCode and extensions"
+  echo "  xfce        Install Xfce desktop"
   echo ""
   exit 1
+}
+
+########################################################################################
+# Create .Xclients file.
+create_xclients() {
+  if [ -d $HOME/.Xclients ]; then
+    echo "$HOME/.Xclients file already exists."
+  else
+    mkdir $HOME/.Xclients
+    chmod +x $HOME/.Xclients
+  fi
 }
 
 ########################################################################################
@@ -52,7 +66,8 @@ install_deps() {
     sudo yum groupinstall "Development Tools" -y
     sudo yum install zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
       openssl-devel xz xz-devel libffi-devel findutils tk-devel epel-release terminator firefox \
-      java-1.8.0-openjdk java-1.8.0-openjdk-devel java-11-openjdk java-11-openjdk-devel maven -y
+      java-1.8.0-openjdk java-1.8.0-openjdk-devel java-11-openjdk java-11-openjdk-devel maven \
+      xorg-x11-xauth -y
     sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
     sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
     # sudo yum check-update
@@ -362,6 +377,90 @@ setup_dev() {
 }
 
 ########################################################################################
+# Setup Cinnamon desktop.
+setup_cinnamon() {
+  if [[ "$DISTRO" == "CENTOS" ]]; then
+    sudo yum install epel-release -y
+    sudo yum groupinstall "Server with GUI" -y
+    sudo yum groupinstall "Xfce" -y
+    sudo systemctl set-default graphical.target
+    sudo systemctl start graphical.target
+
+    create_xclients
+
+    RESPONSE=$(grep cinnamon $HOME/.Xclients)
+    REPLY="X"
+    MATCH="cinnamon"
+    if [[ $RESPONSE =~ $MATCH ]]; then
+      echo "cinnamon" >> $HOME/.Xclients
+    fi
+
+    setup_xrdp
+  fi
+}
+
+########################################################################################
+# Setup Gnome desktop.
+setup_gnome() {
+  if [[ "$DISTRO" == "CENTOS" ]]; then
+    sudo yum groupinstall "GNOME Desktop" "Graphical Administration Tools"
+    sudo systemctl set-default graphical.target
+    sudo systemctl start graphical.target
+
+    create_xclients
+
+    RESPONSE=$(grep gnome-session $HOME/.Xclients)
+    REPLY="X"
+    MATCH="gnome-session"
+    if [[ $RESPONSE =~ $MATCH ]]; then
+      echo "gnome-session" >> $HOME/.Xclients
+    fi
+
+    setup_xrdp
+  fi
+}
+
+########################################################################################
+# Setup Xrdp.
+setup_xrdp() {
+  RESPONSE=$(systemctl status xrdp)
+  REPLY="X"
+  MATCH="Unit xrdp.service could not be found."
+  if [[ $RESPONSE =~ $MATCH ]]; then
+    echo "Installing xrdp..."
+    sudo yum install xrdp -y
+    sudo systemctl enable xrdp
+    sudo systemctl start xrdp
+  else
+    echo "xrdp already installed, restarting the service..."
+    sudo systemctl restart xrdp
+  fi
+}
+
+########################################################################################
+# Setup Xfce desktop.
+setup_xfce() {
+  if [[ "$DISTRO" == "CENTOS" ]]; then
+    sudo yum install epel-release -y
+    sudo yum groupinstall "Server with GUI" -y
+    sudo yum install cinnamon -y
+    sudo systemctl set-default graphical.target
+    sudo systemctl start graphical.target
+
+    create_xclients
+
+    RESPONSE=$(grep startxfce4 $HOME/.Xclients)
+    REPLY="X"
+    MATCH="startxfce4"
+    if [[ $RESPONSE =~ $MATCH ]]; then
+      echo "startxfce4" >> $HOME/.Xclients
+    fi
+
+    setup_xrdp
+  fi
+}
+
+########################################################################################
 # Main entrypoint.
 if [ $# -eq 0 ]; then
   usage
@@ -375,6 +474,9 @@ case $1 in
         install_deps
         setup_dev
         ;;
+    cinnamon)
+        setup_cinnamon
+        ;;
     deps)
         install_deps
         ;;
@@ -386,6 +488,9 @@ case $1 in
         ;;
     git)
         install_git
+        ;;
+    gnome)
+        setup_gnome
         ;;
     gradle)
         install_gradle
@@ -404,6 +509,9 @@ case $1 in
         ;;
     snapd)
         install_snapd
+        ;;
+    xfce)
+        setup_xfce
         ;;
     vscode)
         install_vscode
